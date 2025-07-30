@@ -15,6 +15,7 @@ from dotenv import load_dotenv
 
 from src.agents import GitHubIntegrationAgent
 from src.cli_interface import show_help_summary
+from src.discord_integration import start_discord_bot
 
 # Import all modules
 from src.workflow import run
@@ -82,6 +83,11 @@ def main():
         action="store_true",
         help="Create a pull request (requires --commit)",
     )
+    parser.add_argument(
+        "--discord-bot",
+        action="store_true",
+        help="Run Discord bot to receive prompts",
+    )
     args = parser.parse_args()
 
     if args.create_pr:
@@ -99,6 +105,10 @@ def main():
             "💡 Use: --commit --create-pr to commit changes and create a pull request"
         )
         sys.exit(1)
+
+    if args.discord_bot:
+        start_discord_bot(args.repo_url, args.workdir)
+        return
 
     if args.show_commands:
         show_help_summary()
