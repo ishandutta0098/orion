@@ -16,12 +16,84 @@ load_dotenv()
 
 
 def clone_repo(repo_url: str, clone_path: str) -> None:
-    """Clone a GitHub repo to `clone_path`."""
+    """Clone a GitHub repo to `clone_path` or use existing repo if it exists."""
     if os.path.exists(clone_path):
         print(f"Repository already exists at {clone_path}")
+        # Check if it's a valid git repository
+        try:
+            original_dir = os.getcwd()
+            os.chdir(clone_path)
+            subprocess.run(["git", "status"], check=True, capture_output=True)
+            print("✅ Using existing repository")
+            # Fetch latest changes
+            print("🔄 Fetching latest changes...")
+            subprocess.run(["git", "fetch", "origin"], check=True, capture_output=True)
+            # Switch to main/master branch
+            try:
+                subprocess.run(["git", "checkout", "main"], check=True, capture_output=True)
+            except subprocess.CalledProcessError:
+                try:
+                    subprocess.run(["git", "checkout", "master"], check=True, capture_output=True)
+                except subprocess.CalledProcessError:
+                    print("⚠️ Could not switch to main/master branch, staying on current branch")
+            os.chdir(original_dir)
+        except subprocess.CalledProcessError:
+            print(f"⚠️ Directory exists but is not a valid git repository. Removing and cloning fresh...")
+            import shutil
+            shutil.rmtree(clone_path)
+            print(f"Cloning repository {repo_url} to {clone_path}")
+            subprocess.run(["git", "clone", repo_url, clone_path], check=True)
         return
+    
     print(f"Cloning repository {repo_url} to {clone_path}")
     subprocess.run(["git", "clone", repo_url, clone_path], check=True)
+
+
+def get_unique_branch_name(base_name: str, repo_path: str) -> str:
+    """Generate a unique branch name that doesn't conflict with existing branches.
+    
+    Args:
+        base_name: The base name for the branch
+        repo_path: Path to the git repository
+        
+    Returns:
+        str: A unique branch name
+    """
+    try:
+        # Get list of all branches (local and remote)
+        result = subprocess.run(
+            ["git", "branch", "-a"], 
+            capture_output=True, 
+            text=True, 
+            check=True,
+            cwd=repo_path
+        )
+        existing_branches = set()
+        for line in result.stdout.split('\n'):
+            line = line.strip()
+            if line and not line.startswith('*'):
+                # Remove 'remotes/origin/' prefix if present
+                branch_name = line.replace('remotes/origin/', '').strip()
+                if branch_name and branch_name != 'HEAD':
+                    existing_branches.add(branch_name)
+        
+        # Check if base_name is available
+        if base_name not in existing_branches:
+            return base_name
+        
+        # Generate unique name with counter
+        counter = 1
+        while f"{base_name}-{counter}" in existing_branches:
+            counter += 1
+        
+        return f"{base_name}-{counter}"
+        
+    except subprocess.CalledProcessError as e:
+        print(f"⚠️ Could not get branch list: {e}")
+        # Fallback: use timestamp
+        import time
+        timestamp = int(time.time())
+        return f"{base_name}-{timestamp}"
 
 
 def generate_code_changes(prompt: str, repo_path: str) -> str:
@@ -440,7 +512,7 @@ def run(repo_url: str, user_prompt: str, workdir: Optional[str] = None) -> None:
     
     # Extract repo name from URL for branch naming and directory naming
     repo_name = repo_url.split('/')[-1].replace('.git', '')
-    branch_name = f"ai-update-{repo_name}"
+    base_branch_name = f"ai-update-{repo_name}"
     
     # Create the full path for the repository
     repo_path = os.path.join(workdir, repo_name)
@@ -462,6 +534,10 @@ def run(repo_url: str, user_prompt: str, workdir: Optional[str] = None) -> None:
         except subprocess.CalledProcessError:
             print("Error: Not a valid git repository")
             return
+        
+        # Generate unique branch name
+        branch_name = get_unique_branch_name(base_branch_name, repo_path)
+        print(f"Generated unique branch name: {branch_name}")
         
         # Create new branch
         print(f"Creating new branch: {branch_name}")
@@ -516,24 +592,24 @@ def show_help_summary():
     print("="*60)
     print()
     print("📋 Repository Management:")
-    print("  python agent.py --list-repos                    # List your repositories")
-    print("  python agent.py --list-repos --repo-limit 10    # List 10 repositories")
+    print("  python src/agent.py --list-repos                    # List your repositories")
+    print("  python src/agent.py --list-repos --repo-limit 10    # List 10 repositories")
     print()
     print("🔧 Authentication:")
-    print("  python agent.py --setup-auth                    # Setup GitHub authentication")
-    print("  python auth_setup.py                            # Direct auth setup")
+    print("  python src/agent.py --setup-auth                    # Setup GitHub authentication")
+    print("  python auth_setup.py                                # Direct auth setup")
     print()
     print("🤖 AI Agent Operations:")
-    print("  python agent.py --repo-url <url> --prompt <task>")
-    print("  python agent.py --repo-url https://github.com/owner/repo \\")
-    print("                  --prompt 'Add authentication to the API'")
+    print("  python src/agent.py --repo-url <url> --prompt <task>")
+    print("  python src/agent.py --repo-url https://github.com/owner/repo \\")
+    print("                      --prompt 'Add authentication to the API'")
     print()
     print("🔍 Debug Mode:")
-    print("  python agent.py --list-repos --debug            # Show raw API responses")
+    print("  python src/agent.py --list-repos --debug            # Show raw API responses")
     print()
     print("📚 Setup & Help:")
-    print("  python setup_guide.py                           # Initial setup guide")
-    print("  python agent.py --help                          # Show all options")
+    print("  python setup_guide.py                               # Initial setup guide")
+    print("  python src/agent.py --help                          # Show all options")
     print()
     print("🌐 Useful Links:")
     print("  • Composio Dashboard: https://app.composio.dev/")
