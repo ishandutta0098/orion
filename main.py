@@ -3,7 +3,7 @@
 Orion AI Agent - Main Entry Point
 
 This script orchestrates AI-powered code generation for GitHub repositories.
-It uses modular components for git operations, AI generation, testing, and GitHub integration.
+It uses the new agent-based architecture for better modularity and state management.
 """
 
 import argparse
@@ -13,11 +13,8 @@ import sys
 
 from dotenv import load_dotenv
 
+from src.agents import GitHubIntegrationAgent
 from src.cli_interface import show_help_summary
-from src.github_integration import (
-    check_authentication_setup,
-    list_repositories_with_composio,
-)
 
 # Import all modules
 from src.workflow import run
@@ -110,14 +107,24 @@ def main():
         subprocess.run(["python", "src/auth_setup.py"])
     elif args.list_repos:
         print("📚 Listing repositories from your GitHub account...")
-        list_repositories_with_composio(args.repo_limit)
+
+        # Use the new GitHub Integration Agent
+        github_agent = GitHubIntegrationAgent(debug=args.debug)
+        result = github_agent.list_repositories(args.repo_limit)
+
+        if result:
+            print(result)
+        else:
+            print("❌ Failed to list repositories")
+
         print("\n💡 Tip: Use --debug flag to see raw API responses")
         print(
             "💡 Tip: Run 'python main.py --show-commands' to see all available commands"
         )
     else:
         # Check authentication before running the main workflow
-        if not check_authentication_setup():
+        github_agent = GitHubIntegrationAgent(debug=args.debug)
+        if not github_agent.check_authentication():
             print(
                 "\n💡 Tip: Run 'python main.py --setup-auth' to set up authentication"
             )

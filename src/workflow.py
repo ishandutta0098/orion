@@ -1,18 +1,13 @@
+"""
+Workflow Module for Orion AI Agent System
+
+This module provides the main workflow function that now uses the agent-based architecture.
+"""
+
 import os
-import subprocess
-import sys
 from typing import Optional
 
-from .ai_generator import generate_code_changes, make_code_changes
-from .code_tester import test_generated_code
-from .environment_manager import (
-    create_requirements_file,
-    create_virtual_environment,
-    get_venv_python,
-    install_dependencies,
-)
-from .git_operations import clone_repo, get_unique_branch_name
-from .github_integration import create_pr_with_composio
+from .agents import WorkflowOrchestratorAgent
 
 
 def run(
@@ -25,7 +20,8 @@ def run(
     commit_changes: bool = False,
     create_pr: bool = False,
 ) -> None:
-    """Main workflow for the agent.
+    """
+    Main workflow for the agent using the new agent-based architecture.
 
     Args:
         repo_url: GitHub repository URL
@@ -37,165 +33,74 @@ def run(
         commit_changes: Whether to commit the changes
         create_pr: Whether to create a pull request
     """
-    if workdir is None:
-        workdir = "repo"
+    # Determine debug mode from environment
+    debug_mode = os.getenv("DEBUG", "false").lower() == "true"
 
-    # Extract repo name from URL for branch naming and directory naming
-    repo_name = repo_url.split("/")[-1].replace(".git", "")
-    base_branch_name = f"ai-update-{repo_name}"
+    # Initialize the workflow orchestrator agent
+    orchestrator = WorkflowOrchestratorAgent(debug=debug_mode)
 
-    # Create the full path for the repository
-    repo_path = os.path.join(workdir, repo_name)
+    # Run the complete workflow using the agent
+    result = orchestrator.run_complete_workflow(
+        repo_url=repo_url,
+        user_prompt=user_prompt,
+        workdir=workdir,
+        enable_testing=enable_testing,
+        create_venv=create_venv,
+        strict_testing=strict_testing,
+        commit_changes=commit_changes,
+        create_pr=create_pr,
+    )
 
-    try:
-        print(f"Starting AI agent workflow for: {repo_url}")
-        print(f"Task: {user_prompt}")
-        print(f"Testing enabled: {enable_testing}")
-        print(f"Virtual environment: {create_venv}")
-        print(f"Commit changes: {commit_changes}")
-        print(f"Create PR: {create_pr}")
+    # Print workflow summary
+    if result:
+        print("\n" + "=" * 60)
+        print("📊 WORKFLOW SUMMARY")
+        print("=" * 60)
 
-        # Clone repository to the specific repo directory
-        clone_repo(repo_url, repo_path)
-
-        # Change to repo directory
-        original_dir = os.getcwd()
-        os.chdir(repo_path)
-
-        # Check if we're in a git repository
-        try:
-            subprocess.run(["git", "status"], check=True, capture_output=True)
-        except subprocess.CalledProcessError:
-            print("Error: Not a valid git repository")
-            return
-
-        # Generate unique branch name
-        branch_name = get_unique_branch_name(base_branch_name, repo_path)
-        print(f"Generated unique branch name: {branch_name}")
-
-        # Create new branch
-        print(f"Creating new branch: {branch_name}")
-        subprocess.run(["git", "checkout", "-b", branch_name], check=True)
-
-        # Generate code changes using AI
-        print("Generating code changes using AI...")
-        changes = generate_code_changes(user_prompt, repo_path)
-
-        # Make the code changes
-        created_files = make_code_changes(".", changes)
-
-        # Create virtual environment and test the code (if enabled)
-        if enable_testing and create_venv:
-            try:
-                print("\n" + "=" * 50)
-                print("🧪 Setting up testing environment...")
-                print("=" * 50)
-
-                # Create virtual environment
-                venv_path = create_virtual_environment(".")
-                venv_python = get_venv_python(venv_path)
-
-                # Install dependencies
-                deps_installed = install_dependencies(".", venv_python)
-
-                if deps_installed:
-                    # Test the generated code
-                    tests_passed = test_generated_code(".", venv_python, created_files)
-
-                    # Create/update requirements.txt
-                    create_requirements_file(".", venv_python)
-
-                    if not tests_passed:
-                        print("\n❌ Code tests failed!")
-                        print(
-                            "The generated code has errors that prevent it from running correctly."
-                        )
-                        print("You have the following options:")
-                        print("1. Continue with commit anyway (not recommended)")
-                        print("2. Abort and try again with a different prompt")
-
-                        if strict_testing:
-                            print("\n❌ Strict testing enabled. Aborting commit.")
-                            print("Please fix the test failures and try again.")
-                            sys.exit(1)
-                        else:
-                            # For now, we'll continue but mark it clearly
-                            print("\n⚠️ Continuing with commit despite test failures...")
-                            print("⚠️ The committed code may not work correctly!")
-                    else:
-                        print("\n✅ All tests passed! Code is ready for commit.")
-                else:
-                    print("⚠️ Dependency installation failed, skipping tests...")
-
-            except Exception as e:
-                print(f"⚠️ Testing setup failed: {e}")
-                print("Continuing without testing...")
-        elif enable_testing and not create_venv:
-            print(
-                "⚠️ Testing enabled but virtual environment creation disabled. Skipping tests."
-            )
+        status = result.get("status", "unknown")
+        if status == "completed":
+            print("✅ Status: Completed Successfully")
+        elif status == "failed":
+            print("❌ Status: Failed")
+            error = result.get("error", "Unknown error")
+            print(f"❌ Error: {error}")
         else:
-            print("🚀 Testing disabled, skipping virtual environment and tests...")
+            print(f"⚠️ Status: {status}")
 
-        # Check if we should commit changes
-        if commit_changes:
-            print("\n" + "=" * 50)
-            print("📝 Committing changes...")
-            print("=" * 50)
-
-            # Stage and commit changes
-            print("Staging and committing changes...")
-            subprocess.run(["git", "add", "."], check=True)
-            subprocess.run(
-                ["git", "commit", "-m", f"AI-generated changes: {user_prompt}"],
-                check=True,
-            )
-
-            # Push branch and create PR (if requested)
-            if create_pr:
-                try:
-                    print(f"Pushing branch: {branch_name}")
-                    subprocess.run(["git", "push", "origin", branch_name], check=True)
-
-                    # Create pull request using Composio
-                    print("Creating pull request...")
-                    create_pr_with_composio(
-                        repo_url,
-                        f"AI-generated update: {user_prompt}",
-                        f"This PR contains AI-generated changes for: {user_prompt}\n\nChanges:\n{changes}",
-                        branch_name,
-                    )
-
-                except subprocess.CalledProcessError as e:
-                    print(f"Failed to push branch. Error: {e}")
-                    print("You may need to:")
-                    print("1. Fork the repository first")
-                    print("2. Ensure you have push access")
-                    print(
-                        "3. Set up authentication (SSH keys or personal access token)"
-                    )
+        # Print phase information
+        phases = result.get("phases", {})
+        for phase_name, phase_info in phases.items():
+            phase_status = phase_info.get("status", "unknown")
+            if phase_status == "completed":
+                print(f"✅ {phase_name.replace('_', ' ').title()}: Completed")
             else:
-                print(
-                    "💡 Changes committed locally. Use --create-pr to create a pull request."
-                )
-                print(f"💡 To push manually: git push origin {branch_name}")
-        else:
-            print("\n" + "=" * 50)
-            print("📝 Changes generated but not committed")
-            print("=" * 50)
-            print("💡 Use --commit flag to commit the changes")
-            print("💡 Use --commit --create-pr to commit and create a pull request")
-            print(
-                f"💡 Generated files: {', '.join(created_files) if created_files else 'None'}"
-            )
+                print(f"❌ {phase_name.replace('_', ' ').title()}: {phase_status}")
 
-        print("\n✅ Workflow completed!")
+        # Print created files
+        created_files = result.get("created_files", [])
+        if created_files:
+            print(f"📁 Created Files: {', '.join(created_files)}")
 
-    except subprocess.CalledProcessError as e:
-        print(f"Git operation failed: {e}")
-        print("Make sure you have git installed and the repository URL is correct")
-    except Exception as e:
-        print(f"Error in workflow: {e}")
-    finally:
-        # Return to original directory
-        os.chdir(original_dir)
+        # Print duration if available
+        duration = result.get("duration")
+        if duration:
+            print(f"⏱️ Duration: {duration:.2f} seconds")
+
+        print("=" * 60)
+
+        # Print agent summary if debug mode
+        if debug_mode:
+            print("\n🔧 AGENT EXECUTION SUMMARY")
+            print("=" * 60)
+            summary = orchestrator.get_workflow_summary()
+            agents_summary = summary.get("agents_summary", {})
+
+            for agent_name, agent_stats in agents_summary.items():
+                success_rate = agent_stats.get("success_rate", 0)
+                total_actions = agent_stats.get("total_actions", 0)
+                print(f"🤖 {agent_name.replace('_', ' ').title()}:")
+                print(f"   Actions: {total_actions}, Success Rate: {success_rate:.1f}%")
+            print("=" * 60)
+
+    else:
+        print("❌ Workflow failed to complete - no result returned")
