@@ -107,7 +107,15 @@ def main():
         sys.exit(1)
 
     if args.discord_bot:
-        start_discord_bot(args.repo_url, args.workdir)
+        start_discord_bot(
+            repo_url=args.repo_url,
+            workdir=args.workdir,
+            commit_changes=args.commit,
+            create_pr=args.create_pr,
+            enable_testing=not args.no_testing,
+            create_venv=not args.no_venv,
+            strict_testing=args.strict_testing,
+        )
         return
 
     if args.show_commands:
