@@ -1,3 +1,5 @@
+import asyncio
+import logging
 import os
 
 import discord
@@ -47,34 +49,43 @@ class OrionClient(discord.Client):
         if not text:
             return
 
-        # Send initial response
-        status_msg = f"🤖 Running AI agent with prompt: {text}"
-        if self.create_pr:
-            status_msg += "\n📋 Will create a pull request after completion"
-        elif self.commit_changes:
-            status_msg += "\n💾 Will commit changes after completion"
+        try:
+            # Send initial response
+            status_msg = f"🤖 Running AI agent with prompt: {text}"
+            if self.create_pr:
+                status_msg += "\n📋 Will create a pull request after completion"
+            elif self.commit_changes:
+                status_msg += "\n💾 Will commit changes after completion"
 
-        await message.channel.send(status_msg)
+            await message.channel.send(status_msg)
 
-        # Run the workflow with all configured parameters
-        run(
-            repo_url=self.repo_url,
-            user_prompt=text,
-            workdir=self.workdir,
-            enable_testing=self.enable_testing,
-            create_venv=self.create_venv,
-            strict_testing=self.strict_testing,
-            commit_changes=self.commit_changes,
-            create_pr=self.create_pr,
-        )
+            # Run the workflow in a separate thread to avoid blocking
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(
+                None,
+                run,
+                self.repo_url,
+                text,
+                self.workdir,
+                self.enable_testing,
+                self.create_venv,
+                self.strict_testing,
+                self.commit_changes,
+                self.create_pr,
+            )
 
-        completion_msg = "✅ Task completed"
-        if self.create_pr:
-            completion_msg += " and pull request created"
-        elif self.commit_changes:
-            completion_msg += " and changes committed"
+            completion_msg = "✅ Task completed"
+            if self.create_pr:
+                completion_msg += " and pull request created"
+            elif self.commit_changes:
+                completion_msg += " and changes committed"
 
-        await message.channel.send(completion_msg)
+            await message.channel.send(completion_msg)
+
+        except Exception as e:
+            error_msg = f"❌ Error processing request: {str(e)}"
+            await message.channel.send(error_msg)
+            print(f"Error in on_message: {e}")
 
 
 def start_discord_bot(
@@ -92,8 +103,11 @@ def start_discord_bot(
         print("❌ Missing Discord token. Set DISCORD_BOT_TOKEN.")
         return
 
+    # Enable proper intents
     intents = discord.Intents.default()
     intents.message_content = True
+    intents.messages = True
+
     client = OrionClient(
         repo_url=repo_url,
         workdir=workdir,
@@ -104,5 +118,17 @@ def start_discord_bot(
         strict_testing=strict_testing,
         intents=intents,
     )
-    print("🤖 Discord bot running...")
-    client.run(token)
+
+    print("🤖 Discord bot starting...")
+    print(
+        "🔧 Required permissions: 68608 (Read Messages/View Channels + Send Messages + Read Message History)"
+    )
+
+    try:
+        client.run(token)
+    except discord.LoginFailure:
+        print("❌ Invalid Discord token. Please check your DISCORD_BOT_TOKEN.")
+    except discord.ConnectionClosed:
+        print("❌ Discord connection was closed. Check your internet connection.")
+    except Exception as e:
+        print(f"❌ Bot error: {e}")
