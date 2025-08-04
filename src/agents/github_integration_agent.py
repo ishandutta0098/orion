@@ -5,6 +5,7 @@ This agent handles all GitHub-related operations using Composio integration.
 """
 
 import os
+import re
 import sys
 import time
 from typing import Dict, List, Optional
@@ -240,6 +241,32 @@ class GitHubIntegrationAgent(BaseAgent):
             return formatted_result
 
         return self.execute_with_tracking("create_pull_request", _create_pr_operation)
+
+    def generate_pr_metadata(self, prompt: str) -> Optional[Dict[str, str]]:
+        """Generate branch slug, PR title, and commit message from a prompt using GPT-4o."""
+
+        def _generate():
+            if not self.openai_client:
+                self.openai_client = OpenAI()
+                self.log("OpenAI client initialized")
+
+            system_msg = "Create a concise, human-readable GitHub pull request title."
+            response = self.openai_client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system", "content": system_msg},
+                    {"role": "user", "content": prompt},
+                ],
+                max_tokens=32,
+            )
+
+            raw_title = response.choices[0].message["content"].strip()
+            slug = re.sub(r"[^a-zA-Z0-9\- ]", "", raw_title).strip().lower()
+            slug = re.sub(r"\s+", "-", slug)
+            pr_title = f":robot: [orion] {raw_title}"
+            return {"slug": slug, "title": pr_title, "commit_message": pr_title}
+
+        return self.execute_with_tracking("generate_pr_metadata", _generate)
 
     def _format_repository_results(self, result) -> str:
         """
