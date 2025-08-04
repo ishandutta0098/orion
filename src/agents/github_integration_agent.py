@@ -157,7 +157,7 @@ class GitHubIntegrationAgent(BaseAgent):
         repo_url: str,
         title: str,
         body: str,
-        branch_name: str = "ai-automated-update",
+        branch_name: str = "orion/ai-automated-update",
     ) -> Optional[Dict]:
         """
         Create a GitHub pull request using Composio.
@@ -193,9 +193,15 @@ class GitHubIntegrationAgent(BaseAgent):
             self.log(f"   📋 Title: {title}")
             self.log(f"   🌿 Branch: {branch_name} → main")
 
+            # Don't add prefix if title already has orion prefix
+            if not title.startswith(":robot: [orion]"):
+                formatted_title = f":robot: [orion] {title}"
+            else:
+                formatted_title = title
+
             # Create task for PR creation
             task = f"""Create a pull request in the GitHub repository {owner}/{repo} with the following details:
-            - Title: {title}
+            - Title: {formatted_title}
             - Body: {body}
             - Head branch: {branch_name}
             - Base branch: main
@@ -226,7 +232,7 @@ class GitHubIntegrationAgent(BaseAgent):
             # Update state
             pr_info = {
                 "repo_url": repo_url,
-                "title": title,
+                "title": formatted_title,
                 "body": body,
                 "branch_name": branch_name,
                 "result": result,

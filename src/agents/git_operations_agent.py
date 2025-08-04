@@ -170,16 +170,19 @@ class GitOperationsAgent(BaseAgent):
                     if branch_name and branch_name != "HEAD":
                         existing_branches.add(branch_name)
 
-            # Check if base_name is available
-            if base_name not in existing_branches:
-                return base_name
+            # Create the full branch name with orion prefix
+            full_base_name = f"orion/{base_name}"
+
+            # Check if full base name is available
+            if full_base_name not in existing_branches:
+                return full_base_name
 
             # Generate unique name with counter
             counter = 1
-            while f"{base_name}-{counter}" in existing_branches:
+            while f"orion/{base_name}-{counter}" in existing_branches:
                 counter += 1
 
-            return f"{base_name}-{counter}"
+            return f"orion/{base_name}-{counter}"
 
         branch_name = self.execute_with_tracking(
             "create_unique_branch", _create_branch_operation
@@ -241,6 +244,12 @@ class GitOperationsAgent(BaseAgent):
         """
 
         def _commit_operation():
+            # Don't add prefix if message already has orion prefix
+            if not message.startswith(":robot: [orion]"):
+                formatted_message = f":robot: [orion] {message}"
+            else:
+                formatted_message = message
+
             target_repo = repo_path or self.get_state("current_repo")
             if not target_repo:
                 raise ValueError("No repository path specified and no current repo set")
@@ -254,12 +263,12 @@ class GitOperationsAgent(BaseAgent):
                 subprocess.run(["git", "add", "."], check=True)
 
                 # Commit changes
-                self.log(f"Committing with message: {message}")
-                subprocess.run(["git", "commit", "-m", message], check=True)
+                self.log(f"Committing with message: {formatted_message}")
+                subprocess.run(["git", "commit", "-m", formatted_message], check=True)
 
                 # Update state
                 commit_info = {
-                    "message": message,
+                    "message": formatted_message,
                     "timestamp": time.time(),
                     "branch": self.get_state("current_branch"),
                 }
