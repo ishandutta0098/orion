@@ -37,13 +37,14 @@ class GitOperationsAgent(BaseAgent):
         self.update_state("current_repo", None)
         self.update_state("current_branch", None)
 
-    def clone_repository(self, repo_url: str, clone_path: str) -> bool:
+    def clone_repository(self, repo_url: str, clone_path: str, target_branch: Optional[str] = None) -> bool:
         """
         Clone a GitHub repository to the specified path.
 
         Args:
             repo_url: GitHub repository URL
             clone_path: Path where to clone the repository
+            target_branch: Specific branch to clone (optional)
 
         Returns:
             bool: True if successful, False otherwise
@@ -52,10 +53,14 @@ class GitOperationsAgent(BaseAgent):
         def _clone_operation():
             if os.path.exists(clone_path):
                 self.log(f"Repository already exists at {clone_path}")
-                return self._handle_existing_repository(clone_path, repo_url)
+                return self._handle_existing_repository(clone_path, repo_url, target_branch)
 
-            self.log(f"Cloning repository {repo_url} to {clone_path}")
-            subprocess.run(["git", "clone", repo_url, clone_path], check=True)
+            if target_branch:
+                self.log(f"Cloning repository {repo_url} (branch: {target_branch}) to {clone_path}")
+                subprocess.run(["git", "clone", "-b", target_branch, repo_url, clone_path], check=True)
+            else:
+                self.log(f"Cloning repository {repo_url} to {clone_path}")
+                subprocess.run(["git", "clone", repo_url, clone_path], check=True)
 
             # Update state
             repo_name = os.path.basename(clone_path)
@@ -64,6 +69,7 @@ class GitOperationsAgent(BaseAgent):
             repositories[repo_name] = {
                 "url": repo_url,
                 "path": clone_path,
+                "target_branch": target_branch,
                 "cloned_at": time.time(),
             }
             self.update_state("repositories", repositories)
@@ -74,13 +80,14 @@ class GitOperationsAgent(BaseAgent):
             self.execute_with_tracking("clone_repository", _clone_operation) is not None
         )
 
-    def _handle_existing_repository(self, clone_path: str, repo_url: str) -> bool:
+    def _handle_existing_repository(self, clone_path: str, repo_url: str, target_branch: Optional[str] = None) -> bool:
         """
         Handle an existing repository by validating and updating it.
 
         Args:
             clone_path: Path to the existing repository
             repo_url: Expected repository URL
+            target_branch: Specific branch to switch to (optional)
 
         Returns:
             bool: True if successful, False otherwise
@@ -97,8 +104,23 @@ class GitOperationsAgent(BaseAgent):
             self.log("🔄 Fetching latest changes...")
             subprocess.run(["git", "fetch", "origin"], check=True, capture_output=True)
 
-            # Switch to main/master branch
-            self._switch_to_main_branch()
+            # Switch to target branch or main/master branch
+            if target_branch:
+                self.log(f"🌿 Switching to target branch: {target_branch}")
+                try:
+                    subprocess.run(["git", "checkout", target_branch], check=True, capture_output=True)
+                    self.update_state("current_branch", target_branch)
+                except subprocess.CalledProcessError:
+                    self.log(f"⚠️ Could not switch to target branch {target_branch}, trying origin/{target_branch}")
+                    try:
+                        subprocess.run(["git", "checkout", "-b", target_branch, f"origin/{target_branch}"], check=True, capture_output=True)
+                        self.update_state("current_branch", target_branch)
+                    except subprocess.CalledProcessError:
+                        self.log(f"❌ Could not switch to target branch {target_branch}")
+                        raise Exception(f"Target branch {target_branch} does not exist")
+            else:
+                # Switch to main/master branch
+                self._switch_to_main_branch()
 
             # Update state
             self.update_state("current_repo", clone_path)
@@ -110,7 +132,10 @@ class GitOperationsAgent(BaseAgent):
                 "⚠️ Directory exists but is not a valid git repository. Removing and cloning fresh..."
             )
             shutil.rmtree(clone_path)
-            subprocess.run(["git", "clone", repo_url, clone_path], check=True)
+            if target_branch:
+                subprocess.run(["git", "clone", "-b", target_branch, repo_url, clone_path], check=True)
+            else:
+                subprocess.run(["git", "clone", repo_url, clone_path], check=True)
             return True
 
         finally:

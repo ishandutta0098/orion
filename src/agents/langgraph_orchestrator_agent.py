@@ -37,6 +37,7 @@ class WorkflowState(TypedDict):
     repo_url: str
     user_prompt: str
     workdir: Optional[str]
+    target_branch: Optional[str]
     enable_testing: bool
     create_venv: bool
     strict_testing: bool
@@ -280,12 +281,12 @@ class LangGraphOrchestratorAgent(BaseAgent):
 
             # Clone repository
             clone_success = self.git_agent.clone_repository(
-                state["repo_url"], repo_path
+                state["repo_url"], repo_path, target_branch=state.get("target_branch")
             )
             if not clone_success:
                 raise Exception("Failed to clone repository")
 
-            # Create branch
+            # Create branch for AI changes
             import time
 
             base_branch_name = f"ai-update-{repo_name}-{int(time.time())}"
@@ -629,6 +630,7 @@ class LangGraphOrchestratorAgent(BaseAgent):
         strict_testing: bool = False,
         commit_changes: bool = False,
         create_pr: bool = False,
+        branch: Optional[str] = None,
     ) -> Dict[str, any]:
         """
         Run the intelligent workflow using LangGraph.
@@ -642,6 +644,7 @@ class LangGraphOrchestratorAgent(BaseAgent):
             strict_testing: Whether to abort on test failures
             commit_changes: Whether to commit the changes
             create_pr: Whether to create a pull request
+            branch: Target branch to clone and work on
 
         Returns:
             Dict: Workflow results and summary
@@ -656,6 +659,7 @@ class LangGraphOrchestratorAgent(BaseAgent):
                 repo_url=repo_url,
                 user_prompt=user_prompt,
                 workdir=workdir,
+                target_branch=branch,
                 enable_testing=enable_testing,
                 create_venv=create_venv,
                 strict_testing=strict_testing,

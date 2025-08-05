@@ -1,10 +1,48 @@
 import asyncio
 import logging
 import os
+import re
 
 import discord
 
 from .workflow import run_intelligent_workflow
+
+
+def parse_discord_input(message_content: str) -> tuple[str, str, str] | None:
+    """
+    Parse Discord message input in the specified format.
+    
+    Expected format:
+    URL: <github_repo_url>
+    BRANCH: <branch>
+    TASK: <task>
+    
+    Args:
+        message_content: The Discord message content
+        
+    Returns:
+        tuple[str, str, str] | None: (repo_url, branch, task) or None if parsing fails
+    """
+    # Clean up the message content
+    content = message_content.strip()
+    
+    # Use regex to extract URL, BRANCH, and TASK
+    url_pattern = r"URL:\s*(.+)"
+    branch_pattern = r"BRANCH:\s*(.+)"
+    task_pattern = r"TASK:\s*(.+)"
+    
+    url_match = re.search(url_pattern, content, re.IGNORECASE | re.MULTILINE)
+    branch_match = re.search(branch_pattern, content, re.IGNORECASE | re.MULTILINE)
+    task_match = re.search(task_pattern, content, re.IGNORECASE | re.MULTILINE)
+    
+    if not all([url_match, branch_match, task_match]):
+        return None
+    
+    repo_url = url_match.group(1).strip()
+    branch = branch_match.group(1).strip()
+    task = task_match.group(1).strip()
+    
+    return repo_url, branch, task
 
 
 class OrionClient(discord.Client):
@@ -25,7 +63,8 @@ class OrionClient(discord.Client):
         intents.messages = True
 
         super().__init__(intents=intents)
-        self.repo_url = repo_url or os.environ.get(
+        # Note: repo_url will now be extracted from message, but keeping for backwards compatibility
+        self.default_repo_url = repo_url or os.environ.get(
             "REPO_URL", "https://github.com/ishandutta0098/open-clip"
         )
         self.workdir = workdir or os.environ.get("WORKDIR", os.getcwd())
@@ -41,13 +80,18 @@ class OrionClient(discord.Client):
         print(f"👤 Logged in as: {self.user}")
         print("=" * 60)
         print(f"⚙️  **CONFIGURATION:**")
-        print(f"   📦 Repository: {self.repo_url}")
+        print(f"   📦 Default Repository: {self.default_repo_url}")
         print(f"   📂 Working Dir: {self.workdir}")
         print(f"   💾 Auto-commit: {'✅' if self.commit_changes else '❌'}")
         print(f"   🚀 Auto-PR: {'✅' if self.create_pr else '❌'}")
         print(f"   🧪 Testing: {'✅' if self.enable_testing else '❌'}")
         print(f"   🐍 Virtual Env: {'✅' if self.create_venv else '❌'}")
         print(f"   🔒 Strict Testing: {'✅' if self.strict_testing else '❌'}")
+        print("=" * 60)
+        print(f"📝 **Expected Input Format:**")
+        print(f"   URL: <github_repo_url>")
+        print(f"   BRANCH: <branch>")
+        print(f"   TASK: <task>")
         print("=" * 60)
         print(f"✨ **Ready to process AI tasks!** ✨")
         print("=" * 60)
@@ -60,11 +104,39 @@ class OrionClient(discord.Client):
             return
 
         try:
+            # Parse the Discord input format
+            parsed_input = parse_discord_input(text)
+            
+            if not parsed_input:
+                # Send format error message
+                error_msg = (
+                    "❌ **Invalid Input Format** ❌\n\n"
+                    "📝 **Expected Format:**\n"
+                    "```\n"
+                    "URL: <github_repo_url>\n"
+                    "BRANCH: <branch>\n"
+                    "TASK: <task>\n"
+                    "```\n\n"
+                    "📌 **Example:**\n"
+                    "```\n"
+                    "URL: https://github.com/username/repo\n"
+                    "BRANCH: main\n"
+                    "TASK: Add a new feature to calculate fibonacci numbers\n"
+                    "```\n\n"
+                    "🤖 **Orion AI Agent** - Please try again with the correct format!"
+                )
+                await message.channel.send(error_msg)
+                return
+            
+            repo_url, branch, task = parsed_input
+            
             # Send initial response
             status_msg = (
                 "🤖 **Hello Sir!** 👋\n\n"
                 "🚀 **AI Agent Initiated** 🚀\n"
-                f"📝 **Task:** {text}\n\n"
+                f"📦 **Repository:** {repo_url}\n"
+                f"🌿 **Branch:** {branch}\n"
+                f"📝 **Task:** {task}\n\n"
                 "⚡ **Status:** Processing your request...\n"
             )
             if self.create_pr:
@@ -83,7 +155,7 @@ class OrionClient(discord.Client):
             # Send progress update
             progress_msg = (
                 "⚙️ **Processing in progress...** ⚙️\n\n"
-                "🔄 Cloning repository...\n"
+                f"🔄 Cloning repository from branch '{branch}'...\n"
                 "🤖 Generating AI code...\n"
                 "🧪 Running tests...\n"
                 "📝 Preparing output...\n\n"
@@ -96,14 +168,15 @@ class OrionClient(discord.Client):
             result = await loop.run_in_executor(
                 None,
                 run_intelligent_workflow,
-                self.repo_url,
-                text,
+                repo_url,
+                task,
                 self.workdir,
                 self.enable_testing,
                 self.create_venv,
                 self.strict_testing,
                 self.commit_changes,
                 self.create_pr,
+                branch,  # Add branch parameter
             )
 
             # Delete the progress message
@@ -182,8 +255,9 @@ class OrionClient(discord.Client):
                 "❌ **Error Details:**\n"
                 f"```{str(e)[:200]}{'...' if len(str(e)) > 200 else ''}```\n\n"
                 "🔧 **Next Steps:**\n"
-                "• Check your configuration\n"
+                "• Check your input format\n"
                 "• Verify repository access\n"
+                "• Ensure branch exists\n"
                 "• Contact support if issue persists\n\n"
                 "🤖 **Orion AI Agent** - We'll fix this!"
             )

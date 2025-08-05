@@ -20,6 +20,7 @@ def run_intelligent_workflow(
     strict_testing: bool = False,
     commit_changes: bool = False,
     create_pr: bool = False,
+    branch: Optional[str] = None,
 ) -> Optional[dict]:
     """
     Main workflow for the agent using LangGraph for intelligent coordination.
@@ -43,6 +44,7 @@ def run_intelligent_workflow(
         strict_testing: Whether to abort on test failures
         commit_changes: Whether to commit the changes
         create_pr: Whether to create a pull request
+        branch: Target branch to clone and work on
 
     Returns:
         Optional[dict]: Enhanced workflow result with detailed state tracking
@@ -74,6 +76,7 @@ def run_intelligent_workflow(
         strict_testing=strict_testing,
         commit_changes=commit_changes,
         create_pr=create_pr,
+        branch=branch,
     )
 
     # Enhanced result processing and display
@@ -196,6 +199,7 @@ def run(
     strict_testing: bool = False,
     commit_changes: bool = False,
     create_pr: bool = False,
+    branch: Optional[str] = None,
 ) -> Optional[dict]:
     """
     Backwards compatibility wrapper for the intelligent workflow.
@@ -211,4 +215,5 @@ def run(
         strict_testing=strict_testing,
         commit_changes=commit_changes,
         create_pr=create_pr,
+        branch=branch,
     )
