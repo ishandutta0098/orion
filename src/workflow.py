@@ -19,7 +19,7 @@ def run(
     strict_testing: bool = False,
     commit_changes: bool = False,
     create_pr: bool = False,
-) -> None:
+) -> Optional[dict]:
     """
     Main workflow for the agent using the new agent-based architecture.
 
@@ -32,6 +32,9 @@ def run(
         strict_testing: Whether to abort on test failures
         commit_changes: Whether to commit the changes
         create_pr: Whether to create a pull request
+
+    Returns:
+        Optional[dict]: Workflow result with status, pr_url, and other data
     """
     # Determine debug mode from environment
     debug_mode = os.getenv("DEBUG", "false").lower() == "true"
@@ -86,6 +89,11 @@ def run(
         if duration:
             print(f"⏱️ Duration: {duration:.2f} seconds")
 
+        # Print PR URL if available
+        pr_url = result.get("pr_url")
+        if pr_url:
+            print(f"🔗 Pull Request: {pr_url}")
+
         print("=" * 60)
 
         # Print agent summary if debug mode
@@ -104,3 +112,5 @@ def run(
 
     else:
         print("❌ Workflow failed to complete - no result returned")
+
+    return result

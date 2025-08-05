@@ -1,4 +1,5 @@
 """Utility functions for the command line interface."""
+
 from textwrap import dedent
 
 

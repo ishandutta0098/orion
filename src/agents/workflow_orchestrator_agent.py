@@ -152,6 +152,11 @@ class WorkflowOrchestratorAgent(BaseAgent):
                 session["end_time"] = time.time()
                 session["duration"] = session["end_time"] - session["start_time"]
 
+                # Set PR URL in session if available
+                if create_pr:
+                    git_ops = session.get("phases", {}).get("git_operations", {})
+                    session["pr_url"] = git_ops.get("pr_url")
+
                 self.log("=" * 60)
                 self.log("✅ WORKFLOW COMPLETED SUCCESSFULLY!")
                 self.log("=" * 60)
@@ -206,6 +211,7 @@ class WorkflowOrchestratorAgent(BaseAgent):
             "test_results": None,
             "commit_info": None,
             "pr_info": None,
+            "pr_url": None,
         }
 
         self.log(f"🚀 Starting AI agent workflow for: {repo_url}")
@@ -389,6 +395,7 @@ class WorkflowOrchestratorAgent(BaseAgent):
                         repo_url, pr_title, pr_body, current_branch
                     )
                     pr_created = pr_result is not None
+                    pr_url = pr_result.get("pr_url") if pr_result else None
                 else:
                     self.log("Failed to push branch. You may need to:", "error")
                     self.log("1. Fork the repository first")
@@ -402,6 +409,7 @@ class WorkflowOrchestratorAgent(BaseAgent):
             "commit_success": commit_success,
             "commit_message": commit_message,
             "pr_created": pr_created,
+            "pr_url": pr_url if create_pr else None,
             "status": "completed",
         }
 

@@ -228,6 +228,7 @@ class GitHubIntegrationAgent(BaseAgent):
 
             # Format and store results
             formatted_result = self._format_pr_results(result)
+            pr_url = self.extract_pr_url(result)
 
             # Update state
             pr_info = {
@@ -236,6 +237,7 @@ class GitHubIntegrationAgent(BaseAgent):
                 "body": body,
                 "branch_name": branch_name,
                 "result": result,
+                "pr_url": pr_url,
                 "timestamp": time.time(),
             }
 
@@ -243,7 +245,12 @@ class GitHubIntegrationAgent(BaseAgent):
             pull_requests.append(pr_info)
             self.update_state("pull_requests", pull_requests)
 
-            return formatted_result
+            # Return both formatted result and raw data including URL
+            return {
+                "formatted_result": formatted_result,
+                "pr_url": pr_url,
+                "result": result,
+            }
 
         return self.execute_with_tracking("create_pull_request", _create_pr_operation)
 
@@ -373,6 +380,32 @@ class GitHubIntegrationAgent(BaseAgent):
 
         except Exception as e:
             return f"Error formatting PR results: {e}\nRaw result: {result}"
+
+    def extract_pr_url(self, result) -> Optional[str]:
+        """
+        Extract the PR URL from Composio API response.
+
+        Args:
+            result: The raw result from Composio tool call
+
+        Returns:
+            str: PR URL if found, None otherwise
+        """
+        try:
+            if not result or not isinstance(result, list):
+                return None
+
+            for item in result:
+                if "data" in item:
+                    pr_data = item["data"]
+                    if isinstance(pr_data, dict):
+                        return pr_data.get("html_url")
+
+            return None
+
+        except Exception as e:
+            self.log(f"Error extracting PR URL: {e}", "error")
+            return None
 
     def get_authentication_status(self) -> Dict[str, any]:
         """

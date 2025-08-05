@@ -19,7 +19,11 @@ class OrionClient(discord.Client):
         strict_testing: bool = False,
         **kwargs,
     ) -> None:
+        # Setup intents from kwargs or use defaults with required permissions
         intents = kwargs.get("intents", discord.Intents.default())
+        intents.message_content = True
+        intents.messages = True
+
         super().__init__(intents=intents)
         self.repo_url = repo_url or os.environ.get(
             "REPO_URL", "https://github.com/ishandutta0098/open-clip"
@@ -61,7 +65,7 @@ class OrionClient(discord.Client):
 
             # Run the workflow in a separate thread to avoid blocking
             loop = asyncio.get_event_loop()
-            await loop.run_in_executor(
+            result = await loop.run_in_executor(
                 None,
                 run,
                 self.repo_url,
@@ -77,6 +81,9 @@ class OrionClient(discord.Client):
             completion_msg = "✅ Task completed"
             if self.create_pr:
                 completion_msg += " and pull request created"
+                # Add PR URL if available
+                if result and result.get("pr_url"):
+                    completion_msg += f"\n🔗 Pull Request: {result.get('pr_url')}"
             elif self.commit_changes:
                 completion_msg += " and changes committed"
 
