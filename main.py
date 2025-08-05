@@ -2,8 +2,9 @@
 """
 Orion AI Agent - Main Entry Point
 
-This script orchestrates AI-powered code generation for GitHub repositories.
-It uses the new agent-based architecture for better modularity and state management.
+This script orchestrates AI-powered code generation for GitHub repositories using
+LangGraph for intelligent workflow orchestration, parallel processing, and advanced
+error recovery capabilities.
 """
 
 import argparse
@@ -17,16 +18,30 @@ from src.agents import GitHubIntegrationAgent
 from src.cli_interface import show_help_summary
 from src.discord_integration import start_discord_bot
 
-# Import all modules
-from src.workflow import run
+# Import LangGraph workflow as the default
+from src.workflow import run_intelligent_workflow
 
 # Load environment variables
 load_dotenv()
 
 
 def main():
-    """Main entry point for the Orion AI Agent."""
-    parser = argparse.ArgumentParser(description="Run Orion AI agent")
+    """Main entry point for the Orion AI Agent with LangGraph orchestration."""
+    parser = argparse.ArgumentParser(
+        description="Run Orion AI agent with intelligent LangGraph workflow orchestration",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+🚀 LANGGRAPH FEATURES:
+  • Intelligent workflow routing based on context analysis
+  • Parallel agent execution for improved performance  
+  • Advanced error recovery with multiple retry strategies
+  • State-based decision making throughout workflow
+  • Built-in checkpointing and state persistence
+  • Dynamic workflow adaptation based on repository analysis
+
+💡 TIP: Use --debug for detailed workflow information!
+        """,
+    )
     parser.add_argument(
         "--list-repos",
         action="store_true",
@@ -96,7 +111,9 @@ def main():
     # Set debug mode if requested
     if args.debug:
         os.environ["DEBUG"] = "true"
-        print("🔧 Debug mode enabled - raw API responses will be shown")
+        print(
+            "🔧 Debug mode enabled - detailed LangGraph workflow information will be shown"
+        )
 
     # Validate argument combinations
     if args.create_pr and not args.commit:
@@ -135,7 +152,8 @@ def main():
         else:
             print("❌ Failed to list repositories")
 
-        print("\n💡 Tip: Use --debug flag to see raw API responses")
+        print("\n💡 Tip: Use --debug flag for detailed LangGraph workflow information")
+        print("💡 Tip: LangGraph provides intelligent routing and error recovery")
         print(
             "💡 Tip: Run 'python main.py --show-commands' to see all available commands"
         )
@@ -153,7 +171,8 @@ def main():
 
         print(f"🤖 Running AI agent on repository: {args.repo_url}")
         print(f"📝 Task: {args.prompt}")
-        run(
+        print("✨ Using LangGraph for intelligent workflow orchestration")
+        run_intelligent_workflow(
             args.repo_url,
             args.prompt,
             args.workdir,

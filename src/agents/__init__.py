@@ -10,7 +10,10 @@ from .code_tester_agent import CodeTesterAgent
 from .environment_manager_agent import EnvironmentManagerAgent
 from .git_operations_agent import GitOperationsAgent
 from .github_integration_agent import GitHubIntegrationAgent
-from .workflow_orchestrator_agent import WorkflowOrchestratorAgent
+from .langgraph_orchestrator_agent import LangGraphOrchestratorAgent
+
+# Keep the old name for backwards compatibility
+WorkflowOrchestratorAgent = LangGraphOrchestratorAgent
 
 __all__ = [
     "AIGeneratorAgent",
@@ -18,7 +21,8 @@ __all__ = [
     "EnvironmentManagerAgent",
     "GitOperationsAgent",
     "GitHubIntegrationAgent",
-    "WorkflowOrchestratorAgent",
+    "LangGraphOrchestratorAgent",
+    "WorkflowOrchestratorAgent",  # Backwards compatibility
 ]
 
 __version__ = "1.0.0"

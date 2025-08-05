@@ -4,7 +4,7 @@ import os
 
 import discord
 
-from .workflow import run
+from .workflow import run_intelligent_workflow
 
 
 class OrionClient(discord.Client):
@@ -91,11 +91,11 @@ class OrionClient(discord.Client):
             )
             progress_message = await message.channel.send(progress_msg)
 
-            # Run the workflow in a separate thread to avoid blocking
+            # Run the LangGraph workflow in a separate thread to avoid blocking
             loop = asyncio.get_event_loop()
             result = await loop.run_in_executor(
                 None,
-                run,
+                run_intelligent_workflow,
                 self.repo_url,
                 text,
                 self.workdir,
@@ -118,13 +118,26 @@ class OrionClient(discord.Client):
             if self.create_pr:
                 completion_msg += "✅ **Pull Request Created** 🚀\n"
                 completion_msg += "📦 **Repository Updated** with AI-generated code\n"
-                if result and result.get("pr_url"):
-                    completion_msg += f"\n🔗 **PR Link:** {result.get('pr_url')}\n"
+
+                # Try multiple ways to get the PR URL
+                pr_url = None
+                if result:
+                    pr_url = result.get("pr_url")
+                    if not pr_url and result.get("pr_info"):
+                        pr_url = result.get("pr_info", {}).get("pr_url")
+
+                if pr_url:
+                    completion_msg += f"\n🔗 **PR Link:** {pr_url}\n"
                     completion_msg += "👀 **Ready for Review** - Check out the changes!"
                 else:
                     completion_msg += (
                         "\n⚠️ **Note:** PR was created but link unavailable"
                     )
+                    # Add debug information if available
+                    if result:
+                        completion_msg += (
+                            f"\n🔧 **Debug:** Status={result.get('status', 'unknown')}"
+                        )
             elif self.commit_changes:
                 completion_msg += "✅ **Changes Committed** 💾\n"
                 completion_msg += "📦 **Repository Updated** with AI-generated code\n"
