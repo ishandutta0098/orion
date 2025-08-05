@@ -11,37 +11,43 @@ from .workflow import run_intelligent_workflow
 def parse_discord_input(message_content: str) -> tuple[str, str, str] | None:
     """
     Parse Discord message input in the specified format.
-    
+
     Expected format:
     URL: <github_repo_url>
-    BRANCH: <branch>
+    BRANCH: <branch> (optional, defaults to 'main')
     TASK: <task>
-    
+
     Args:
         message_content: The Discord message content
-        
+
     Returns:
         tuple[str, str, str] | None: (repo_url, branch, task) or None if parsing fails
     """
     # Clean up the message content
     content = message_content.strip()
-    
+
     # Use regex to extract URL, BRANCH, and TASK
     url_pattern = r"URL:\s*(.+)"
     branch_pattern = r"BRANCH:\s*(.+)"
     task_pattern = r"TASK:\s*(.+)"
-    
+
     url_match = re.search(url_pattern, content, re.IGNORECASE | re.MULTILINE)
     branch_match = re.search(branch_pattern, content, re.IGNORECASE | re.MULTILINE)
     task_match = re.search(task_pattern, content, re.IGNORECASE | re.MULTILINE)
-    
-    if not all([url_match, branch_match, task_match]):
+
+    # URL and TASK are required
+    if not (url_match and task_match):
         return None
-    
+
     repo_url = url_match.group(1).strip()
-    branch = branch_match.group(1).strip()
     task = task_match.group(1).strip()
-    
+
+    # Default branch to 'main' if not provided
+    if branch_match and branch_match.group(1).strip():
+        branch = branch_match.group(1).strip()
+    else:
+        branch = "main"
+
     return repo_url, branch, task
 
 
@@ -90,7 +96,7 @@ class OrionClient(discord.Client):
         print("=" * 60)
         print(f"📝 **Expected Input Format:**")
         print(f"   URL: <github_repo_url>")
-        print(f"   BRANCH: <branch>")
+        print(f"   BRANCH: <branch> (optional, default: 'main')")
         print(f"   TASK: <task>")
         print("=" * 60)
         print(f"✨ **Ready to process AI tasks!** ✨")
@@ -114,13 +120,12 @@ class OrionClient(discord.Client):
                     "📝 **Expected Format:**\n"
                     "```\n"
                     "URL: <github_repo_url>\n"
-                    "BRANCH: <branch>\n"
+                    "BRANCH: <branch> (optional, defaults to 'main')\n"
                     "TASK: <task>\n"
                     "```\n\n"
                     "📌 **Example:**\n"
                     "```\n"
                     "URL: https://github.com/username/repo\n"
-                    "BRANCH: main\n"
                     "TASK: Add a new feature to calculate fibonacci numbers\n"
                     "```\n\n"
                     "🤖 **Orion AI Agent** - Please try again with the correct format!"
