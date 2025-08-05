@@ -55,11 +55,17 @@ class OrionClient(discord.Client):
 
         try:
             # Send initial response
-            status_msg = f"🤖 Running AI agent with prompt: {text}"
+            status_msg = (
+                "Hello Sir\n\n"
+                "I have initiated the task with the prompt:\n"
+                f"{text}.\n\n"
+            )
             if self.create_pr:
-                status_msg += "\n📋 Will create a pull request after completion"
+                status_msg += "I will raise a PR after completion."
             elif self.commit_changes:
-                status_msg += "\n💾 Will commit changes after completion"
+                status_msg += "I will commit the changes after completion."
+            else:
+                status_msg += "I will update you once it's done."
 
             await message.channel.send(status_msg)
 
@@ -78,14 +84,15 @@ class OrionClient(discord.Client):
                 self.create_pr,
             )
 
-            completion_msg = "✅ Task completed"
+            completion_msg = "Hello Sir\n\n"
             if self.create_pr:
-                completion_msg += " and pull request created"
-                # Add PR URL if available
+                completion_msg += "The task has been completed and PR has been raised."
                 if result and result.get("pr_url"):
-                    completion_msg += f"\n🔗 Pull Request: {result.get('pr_url')}"
+                    completion_msg += f"\n\nPR Link: {result.get('pr_url')}"
             elif self.commit_changes:
-                completion_msg += " and changes committed"
+                completion_msg += "The task has been completed and changes have been committed."
+            else:
+                completion_msg += "The task has been completed."
 
             await message.channel.send(completion_msg)
 
