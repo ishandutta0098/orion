@@ -17,6 +17,7 @@ from dotenv import load_dotenv
 from src.agents import GitHubIntegrationAgent
 from src.cli_interface import show_help_summary
 from src.discord_integration import start_discord_bot
+from src.code_explainer import explain_repository
 
 # Import LangGraph workflow as the default
 from src.workflow import run_intelligent_workflow
@@ -51,6 +52,11 @@ def main():
         "--repo-url",
         help="GitHub repository URL",
         default="https://github.com/ishandutta0098/open-clip",
+    )
+    parser.add_argument(
+        "--branch",
+        help="Name of the branch to work on",
+        default=None,
     )
     parser.add_argument(
         "--prompt",
@@ -169,6 +175,16 @@ def main():
             )
             sys.exit(1)
 
+        if args.prompt.strip().lower() == "explain":
+            if args.commit or args.create_pr:
+                print("ℹ️ Explanation mode ignores commit and PR options.")
+            explain_repository(
+                args.repo_url,
+                args.workdir,
+                branch=args.branch,
+            )
+            return
+
         print(f"🤖 Running AI agent on repository: {args.repo_url}")
         print(f"📝 Task: {args.prompt}")
         print("✨ Using LangGraph for intelligent workflow orchestration")
@@ -181,6 +197,7 @@ def main():
             strict_testing=args.strict_testing,
             commit_changes=args.commit,
             create_pr=args.create_pr,
+            branch=args.branch,
         )
 
 
