@@ -66,7 +66,7 @@ def main():
     parser.add_argument(
         "--workdir",
         help="Working directory for cloning",
-        default="/Users/ishandutta/Documents/code",
+        default="/Users/ishandutta/Documents/code/orion-backend",
     )
     parser.add_argument(
         "--repo-limit",
