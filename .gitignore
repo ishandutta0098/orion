@@ -35,3 +35,4 @@ build/
 # End Generation Here
 
 *.venv
+run.sh

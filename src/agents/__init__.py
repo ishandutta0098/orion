@@ -11,6 +11,8 @@ from .environment_manager_agent import EnvironmentManagerAgent
 from .git_operations_agent import GitOperationsAgent
 from .github_integration_agent import GitHubIntegrationAgent
 from .langgraph_orchestrator_agent import LangGraphOrchestratorAgent
+from .repository_scanner_agent import RepositoryScannerAgent
+from .task_classifier_agent import TaskClassifierAgent
 
 # Keep the old name for backwards compatibility
 WorkflowOrchestratorAgent = LangGraphOrchestratorAgent

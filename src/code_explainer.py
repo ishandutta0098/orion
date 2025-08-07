@@ -47,7 +47,7 @@ def explain_repository(
     (e.g., the Discord bot) in addition to being printed to the
     terminal.
     """
-    repo_name = os.path.splitext(os.path.basename(repo_url.rstrip('/')))[0]
+    repo_name = os.path.splitext(os.path.basename(repo_url.rstrip("/")))[0]
     repo_path = os.path.join(workdir, repo_name)
 
     if not os.path.exists(repo_path):
@@ -78,9 +78,7 @@ def explain_repository(
             f"Failed to generate explanation via OpenAI API: {e}\n" f"\n{summary}"
         )
 
-    print(
-        f"\n📚 Codebase overview for {repo_name} (branch: {branch or 'default'})"
-    )
+    print(f"\n📚 Codebase overview for {repo_name} (branch: {branch or 'default'})")
     print("=" * 60)
     print(explanation)
 

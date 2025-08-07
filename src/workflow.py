@@ -17,6 +17,7 @@ def run_intelligent_workflow(
     workdir: Optional[str] = None,
     enable_testing: bool = True,
     create_venv: bool = True,
+    conda_env: str = "ml",
     strict_testing: bool = False,
     commit_changes: bool = False,
     create_pr: bool = False,
@@ -41,6 +42,7 @@ def run_intelligent_workflow(
         workdir: Working directory for cloning
         enable_testing: Whether to test the generated code
         create_venv: Whether to create a virtual environment
+        conda_env: Conda environment to use for running code
         strict_testing: Whether to abort on test failures
         commit_changes: Whether to commit the changes
         create_pr: Whether to create a pull request
@@ -73,6 +75,7 @@ def run_intelligent_workflow(
         workdir=workdir,
         enable_testing=enable_testing,
         create_venv=create_venv,
+        conda_env=conda_env,
         strict_testing=strict_testing,
         commit_changes=commit_changes,
         create_pr=create_pr,

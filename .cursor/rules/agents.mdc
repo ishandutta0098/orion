@@ -1,0 +1,6 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+1. Before running terminal commands run "conda activate orion" to ensure that the conda environment is activated.

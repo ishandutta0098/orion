@@ -23,6 +23,8 @@ from .code_tester_agent import CodeTesterAgent
 from .environment_manager_agent import EnvironmentManagerAgent
 from .git_operations_agent import GitOperationsAgent
 from .github_integration_agent import GitHubIntegrationAgent
+from .repository_scanner_agent import RepositoryScannerAgent
+from .task_classifier_agent import TaskClassifierAgent
 
 
 class WorkflowState(TypedDict):
@@ -40,6 +42,7 @@ class WorkflowState(TypedDict):
     target_branch: Optional[str]
     enable_testing: bool
     create_venv: bool
+    conda_env: str
     strict_testing: bool
     commit_changes: bool
     create_pr: bool
@@ -55,6 +58,9 @@ class WorkflowState(TypedDict):
     branch_name: Optional[str]
     generated_code: Optional[str]
     created_files: List[str]
+    modified_files: List[str]
+    repository_scan: Optional[Dict]
+    task_classification: Optional[Dict]
     test_results: Optional[Dict]
     venv_path: Optional[str]
     commit_info: Optional[Dict]
@@ -104,6 +110,8 @@ class LangGraphOrchestratorAgent(BaseAgent):
         self.github_agent = GitHubIntegrationAgent(debug=debug)
         self.env_agent = EnvironmentManagerAgent(debug=debug)
         self.test_agent = CodeTesterAgent(debug=debug)
+        self.scanner_agent = RepositoryScannerAgent(debug=debug)
+        self.classifier_agent = TaskClassifierAgent(debug=debug)
 
         # Initialize LangGraph components
         self.memory = MemorySaver()
@@ -125,6 +133,8 @@ class LangGraphOrchestratorAgent(BaseAgent):
 
         # Add all workflow nodes
         workflow.add_node("analyze_repository", self._analyze_repository)
+        workflow.add_node("classify_task", self._classify_task_node)
+        workflow.add_node("scan_repository", self._scan_repository_node)
         workflow.add_node("setup_repository", self._setup_repository_node)
         workflow.add_node("generate_code", self._generate_code_node)
         workflow.add_node("setup_environment", self._setup_environment_node)
@@ -142,7 +152,26 @@ class LangGraphOrchestratorAgent(BaseAgent):
             "analyze_repository",
             self._route_after_analysis,
             {
-                "setup_repo": "setup_repository",
+                "classify_task": "classify_task",
+                "error": "error_recovery",
+            },
+        )
+
+        workflow.add_conditional_edges(
+            "classify_task",
+            self._route_after_classification,
+            {
+                "scan_repository": "scan_repository",
+                "setup_repository": "setup_repository",
+                "error": "error_recovery",
+            },
+        )
+
+        workflow.add_conditional_edges(
+            "scan_repository",
+            self._route_after_scan,
+            {
+                "setup_repository": "setup_repository",
                 "error": "error_recovery",
             },
         )
@@ -151,6 +180,7 @@ class LangGraphOrchestratorAgent(BaseAgent):
             "setup_repository",
             self._route_after_repo_setup,
             {
+                "scan_repository": "scan_repository",
                 "generate_code": "generate_code",
                 "parallel_setup": "parallel_coordinator",
                 "error": "error_recovery",
@@ -267,6 +297,117 @@ class LangGraphOrchestratorAgent(BaseAgent):
 
         return state
 
+    def _classify_task_node(self, state: WorkflowState) -> WorkflowState:
+        """
+        Classify the user task to determine approach.
+
+        Args:
+            state: Current workflow state
+
+        Returns:
+            Updated workflow state
+        """
+        self.log("🔍 Classifying task...")
+
+        try:
+            state["current_phase"] = "task_classification"
+
+            # Classify the task
+            classification = self.classifier_agent.classify_task(state["user_prompt"])
+
+            state["task_classification"] = classification
+            state["completed_phases"].append("task_classification")
+            state["status"] = "task_classified"
+
+            primary_action = classification.get("primary_action", "create")
+            task_type = classification.get("task_type", "general")
+            confidence = classification.get("confidence", 0.5)
+
+            self.log(
+                f"✅ Task classified: {primary_action} ({task_type}) - confidence: {confidence:.2f}"
+            )
+
+        except Exception as e:
+            state["error"] = f"Task classification failed: {str(e)}"
+            state["status"] = "error"
+            state["failed_phases"].append("task_classification")
+
+        return state
+
+    def _scan_repository_node(self, state: WorkflowState) -> WorkflowState:
+        """
+        Scan the repository to understand its structure.
+
+        Args:
+            state: Current workflow state
+
+        Returns:
+            Updated workflow state
+        """
+        self.log("🔍 Scanning repository...")
+
+        try:
+            state["current_phase"] = "repository_scan"
+
+            if not state.get("repo_path"):
+                raise Exception("Repository path not available")
+
+            # Scan the repository
+            scan_result = self.scanner_agent.scan_repository(state["repo_path"])
+
+            state["repository_scan"] = scan_result
+
+            # Validate mentioned files against repository
+            task_classification = state.get("task_classification", {})
+            if task_classification:
+                mentioned_files = task_classification.get("mentioned_files", [])
+                if mentioned_files:
+                    validated_files = self.classifier_agent.validate_and_find_files(
+                        mentioned_files, scan_result
+                    )
+                    # Update task classification with validated files
+                    task_classification["target_files"] = validated_files
+                    task_classification["validated_files"] = validated_files
+                    state["task_classification"] = task_classification
+                    self.log(f"💡 Validated files: {validated_files}")
+
+            state["completed_phases"].append("repository_scan")
+            state["status"] = "repository_scanned"
+
+            total_files = scan_result.get("total_files", 0)
+            python_files = len(scan_result.get("python_files", []))
+
+            self.log(
+                f"✅ Repository scanned: {total_files} files ({python_files} Python files)"
+            )
+
+        except Exception as e:
+            state["error"] = f"Repository scan failed: {str(e)}"
+            state["status"] = "error"
+            state["failed_phases"].append("repository_scan")
+
+        return state
+
+    def _route_after_analysis(self, state: WorkflowState) -> str:
+        """Route after repository analysis."""
+        if state["status"] == "error":
+            return "error"
+        return "classify_task"
+
+    def _route_after_classification(self, state: WorkflowState) -> str:
+        """Route after task classification."""
+        if state["status"] == "error":
+            return "error"
+
+        # Always setup repository first, then optionally scan
+        return "setup_repository"
+
+    def _route_after_scan(self, state: WorkflowState) -> str:
+        """Route after repository scan."""
+        if state["status"] == "error":
+            return "error"
+        return "setup_repository"
+
     def _setup_repository_node(self, state: WorkflowState) -> WorkflowState:
         """Repository setup node for LangGraph workflow."""
         self.log("🔄 Setting up repository...")
@@ -318,32 +459,55 @@ class LangGraphOrchestratorAgent(BaseAgent):
         return state
 
     def _generate_code_node(self, state: WorkflowState) -> WorkflowState:
-        """Code generation node for LangGraph workflow."""
-        self.log("🤖 Generating code...")
+        """Enhanced code generation node with context awareness."""
+        self.log("🤖 Generating code with enhanced context...")
 
         try:
             state["current_phase"] = "code_generation"
 
-            # Generate code using AI agent
-            generated_code = self.ai_agent.generate_code_changes(
-                state["user_prompt"], state["repo_path"]
-            )
+            # Get context from previous phases
+            repository_context = state.get("repository_scan")
+            task_classification = state.get("task_classification")
+
+            # Generate code using enhanced AI agent
+            if repository_context or task_classification:
+                generated_code = self.ai_agent.generate_code_with_context(
+                    state["user_prompt"],
+                    state["repo_path"],
+                    repository_context,
+                    task_classification,
+                )
+            else:
+                # Fallback to basic generation
+                generated_code = self.ai_agent.generate_code_changes(
+                    state["user_prompt"], state["repo_path"]
+                )
 
             if not generated_code:
                 raise Exception("Code generation failed")
 
-            # Apply code changes
-            created_files = self.ai_agent.make_code_changes(
-                state["repo_path"], generated_code
+            # Apply code changes using the available method
+            success = self.ai_agent.make_code_changes(
+                generated_code, state["repo_path"]
             )
 
+            if success:
+                # Get the lists of created and modified files from the agent state
+                state["created_files"] = self.ai_agent.get_created_files()
+                state["modified_files"] = self.ai_agent.get_modified_files()
+            else:
+                self.log("⚠️ Code application failed", "warning")
+                state["created_files"] = []
+                state["modified_files"] = []
+
             state["generated_code"] = generated_code
-            state["created_files"] = created_files or []
             state["completed_phases"].append("code_generation")
             state["status"] = "code_generated"
 
+            total_changes = len(state["created_files"]) + len(state["modified_files"])
             self.log(
-                f"✅ Code generation complete. Created {len(state['created_files'])} files"
+                f"✅ Code generation complete. Created {len(state['created_files'])} files, "
+                f"modified {len(state['modified_files'])} files (total: {total_changes} changes)"
             )
 
         except Exception as e:
@@ -355,13 +519,14 @@ class LangGraphOrchestratorAgent(BaseAgent):
 
     def _setup_environment_node(self, state: WorkflowState) -> WorkflowState:
         """Environment setup node for LangGraph workflow."""
-        self.log("🧪 Setting up testing environment...")
+        self.log("🧪 Setting up environment...")
 
         try:
             state["current_phase"] = "environment_setup"
 
             if state["create_venv"]:
-                # Create virtual environment
+                # Legacy: Create virtual environment
+                self.log("⚠️ Using legacy virtual environment creation")
                 venv_path = self.env_agent.create_virtual_environment(
                     state["repo_path"]
                 )
@@ -377,6 +542,14 @@ class LangGraphOrchestratorAgent(BaseAgent):
                         self.env_agent.create_requirements_file(
                             state["repo_path"], venv_python
                         )
+            else:
+                # Use conda environment (preferred)
+                conda_env = state.get("conda_env", "ml")
+                self.log(f"🐍 Using conda environment: {conda_env}")
+
+                # Set the conda environment for testing
+                state["venv_path"] = f"conda:{conda_env}"
+                self.log(f"✅ Conda environment configured: {conda_env}")
 
             state["completed_phases"].append("environment_setup")
             state["status"] = "environment_ready"
@@ -397,15 +570,27 @@ class LangGraphOrchestratorAgent(BaseAgent):
         try:
             state["current_phase"] = "testing"
 
-            if state["enable_testing"] and state["created_files"]:
-                venv_python = (
-                    self.env_agent.get_venv_python(state["venv_path"])
-                    if state["venv_path"]
-                    else None
-                )
+            if state["enable_testing"] and (
+                state["created_files"] or state["modified_files"]
+            ):
+                # Determine execution environment
+                if state.get("venv_path", "").startswith("conda:"):
+                    # Use conda environment
+                    conda_env = state["venv_path"].replace("conda:", "")
+                    venv_python = f"conda run -n {conda_env} python"
+                else:
+                    # Use virtual environment (legacy)
+                    venv_python = (
+                        self.env_agent.get_venv_python(state["venv_path"])
+                        if state["venv_path"]
+                        else None
+                    )
+
+                # Combine created and modified files for testing
+                test_files = state["created_files"] + state.get("modified_files", [])
 
                 test_passed = self.test_agent.test_generated_code(
-                    state["repo_path"], venv_python, state["created_files"]
+                    state["repo_path"], venv_python, test_files
                 )
 
                 test_results = self.test_agent.get_test_results(state["repo_path"])
@@ -559,12 +744,19 @@ class LangGraphOrchestratorAgent(BaseAgent):
         """Route after repository analysis."""
         if state["status"] == "error":
             return "error"
-        return "setup_repo"
+        return "classify_task"
 
     def _route_after_repo_setup(self, state: WorkflowState) -> str:
         """Route after repository setup."""
         if state["status"] == "error":
             return "error"
+
+        # Check if repository scan is needed
+        classification = state.get("task_classification", {})
+        requires_scan = classification.get("requires_repository_scan", False)
+
+        if requires_scan and not state.get("repository_scan"):
+            return "scan_repository"
 
         # Check if we should use parallel processing
         if state.get("parallel_tasks"):
@@ -627,6 +819,7 @@ class LangGraphOrchestratorAgent(BaseAgent):
         workdir: Optional[str] = None,
         enable_testing: bool = True,
         create_venv: bool = True,
+        conda_env: str = "ml",
         strict_testing: bool = False,
         commit_changes: bool = False,
         create_pr: bool = False,
@@ -662,6 +855,7 @@ class LangGraphOrchestratorAgent(BaseAgent):
                 target_branch=branch,
                 enable_testing=enable_testing,
                 create_venv=create_venv,
+                conda_env=conda_env,
                 strict_testing=strict_testing,
                 commit_changes=commit_changes,
                 create_pr=create_pr,
@@ -672,6 +866,9 @@ class LangGraphOrchestratorAgent(BaseAgent):
                 branch_name=None,
                 generated_code=None,
                 created_files=[],
+                modified_files=[],
+                repository_scan=None,
+                task_classification=None,
                 test_results=None,
                 venv_path=None,
                 commit_info=None,

@@ -70,41 +70,156 @@ result = orchestrator.run_workflow(
 
 ---
 
-### 2. AI Generator Agent (`AIGeneratorAgent`)
+### 2. AI Generator Agent (`AIGeneratorAgent`) - **GPT-5 POWERED**
 
-**Purpose**: AI-powered code generation using LangChain and OpenAI models.
+**Purpose**: AI-powered code generation using GPT-5 with advanced reasoning capabilities and structured outputs.
 
-**Capabilities**:
-- Generate code based on natural language prompts
-- Extract and process AI responses intelligently
-- Manage code generation state and history
-- Create fallback implementations for edge cases
-- Analyze generated code quality
+**GPT-5 Features**:
+- **GPT-5 Model Support**: Direct integration with gpt-5, gpt-5-mini, gpt-5-nano, and gpt-5-chat models
+- **Large Context Windows**: Up to 272K tokens for comprehensive codebase analysis
+- **Advanced Reasoning**: Native step-by-step analysis and decision making
+- **Structured Outputs**: JSON-based responses with Pydantic validation
+- **Enhanced Prompts**: Optimized prompt engineering for better code generation
+
+**Core Capabilities**:
+- Generate complete, production-ready code files
+- Modify existing files with surgical precision
+- Structured output with reasoning and confidence scoring
+- Repository context analysis for informed code generation
+- Comprehensive error handling and fallback mechanisms
 
 **Key Methods**:
-- `generate_code_changes()`: Generate code modifications based on prompts
-- `make_code_changes()`: Apply generated changes to repository files
-- `extract_python_code_from_text()`: Parse AI responses for code blocks
-- `analyze_code_quality()`: Evaluate generated code for best practices
+- `generate_code_changes()`: Generate code using GPT-5 with structured output
+- `generate_code_with_context()`: Generate with additional repository context
+- `modify_existing_file()`: Precise file modifications with GPT-5
+- `get_model_info()`: Get current GPT-5 model information
+- `apply_code_changes_enhanced()`: Apply generated changes to repository
 
 **Configuration**:
-- **Model**: Configurable OpenAI model (default: `gpt-4o-mini`)
-- **Temperature**: Control randomness in generation (default: `0.1`)
-- **Context**: Repository analysis for informed code generation
+- **Model**: GPT-5 model variant (default: `gpt-5-mini`)
+- **Temperature**: Low temperature for deterministic code (0.1)
+- **Context Window**: 272K tokens for GPT-5 models
+- **Structured Output**: JSON responses with validation
 
-**Example**:
+**Usage Examples**:
 ```python
-ai_agent = AIGeneratorAgent(model="gpt-4o-mini", temperature=0.1)
-result = ai_agent.generate_code_changes(
-    prompt="Create a REST API endpoint for user authentication",
+# Initialize with GPT-5
+ai_agent = AIGeneratorAgent(
+    model="gpt-5-mini",  # or gpt-5, gpt-5-nano, gpt-5-chat
+    temperature=0.1,
+    debug=True
+)
+
+# Generate code with GPT-5
+result = ai_agent.execute("generate", 
+    prompt="Create a FastAPI web application with authentication and database models",
     repo_path="/path/to/repo",
     context={"framework": "FastAPI", "database": "PostgreSQL"}
 )
+
+# Modify existing files with precision
+ai_agent.execute("modify",
+    repo_path="/path/to/repo",
+    file_path="main.py", 
+    modification_description="Change the default port from 8000 to 8080"
+)
+
+# Check GPT-5 model information
+model_info = ai_agent.execute("model_info")
+print(f"Model: {model_info['model']}, GPT-5: {model_info['is_gpt5']}")
+print(f"Context window: {model_info['context_window']} tokens")
+```
+
+**Enhanced Output Format**:
+```json
+{
+  "success": true,
+  "files": [
+    {"name": "main.py", "content": "complete production-ready code"},
+    {"name": "requirements.txt", "content": "fastapi==0.104.1\nsqlalchemy==2.0.23"}
+  ],
+  "modifications": [
+    {"target": "config.py", "changes": "specific changes to implement"}
+  ],
+  "reasoning": "Detailed step-by-step analysis: 1. ANALYZE: Requirements show need for async API... 2. DESIGN: Chose FastAPI for performance...",
+  "dependencies": ["fastapi", "sqlalchemy"],
+  "next_steps": ["Set up database migrations", "Configure monitoring"],
+  "confidence": 0.95
+}
 ```
 
 ---
 
-### 3. Git Operations Agent (`GitOperationsAgent`)
+### 3. Repository Scanner Agent (`RepositoryScannerAgent`) **NEW**
+
+**Purpose**: Scan and analyze repository structure and content to understand existing codebases.
+
+**Capabilities**:
+- Scan repository file structure and inventory
+- Analyze Python files to extract classes, functions, imports
+- Identify modification candidates
+- Build repository knowledge graph
+- Provide file content reading capabilities
+
+**Key Methods**:
+- `scan_repository()`: Comprehensive repository analysis
+- `get_file_content()`: Read specific file contents
+- `find_files_by_pattern()`: Find files matching patterns
+- `get_repository_summary()`: Get analysis summary
+
+**Configuration**:
+- **File Filtering**: Automatically ignores common build/cache directories
+- **Analysis Depth**: Extracts code structure without full AST parsing
+- **Performance**: Optimized for repositories up to 1000 files
+
+**Example**:
+```python
+scanner = RepositoryScannerAgent(debug=True)
+analysis = scanner.scan_repository("/path/to/repo")
+print(f"Found {analysis['total_files']} files")
+print(f"Python files: {len(analysis['python_files'])}")
+```
+
+---
+
+### 4. Task Classifier Agent (`TaskClassifierAgent`) **NEW**
+
+**Purpose**: Analyze user prompts to determine task type, complexity, and target files.
+
+**Capabilities**:
+- Classify tasks as modification vs creation
+- Extract file names mentioned in prompts
+- Determine task types (bug fix, feature, refactor, etc.)
+- Assess task complexity and scope
+- Suggest target files for modification
+
+**Key Methods**:
+- `classify_task()`: Comprehensive task analysis
+- `suggest_target_files()`: Recommend files to modify
+- `get_classification_history()`: View classification history
+
+**Task Types**:
+- **Bug Fix**: Error correction and issue resolution
+- **Feature**: New functionality implementation
+- **Refactor**: Code restructuring and optimization
+- **Enhancement**: Improvements to existing features
+- **Maintenance**: Updates and integrations
+- **Documentation**: Code documentation and comments
+
+**Example**:
+```python
+classifier = TaskClassifierAgent(debug=True)
+result = classifier.classify_task(
+    "Fix the bug in user_auth.py where login fails",
+    repository_context=repo_analysis
+)
+print(f"Action: {result['primary_action']}")  # "modify"
+print(f"Files: {result['mentioned_files']}")  # ["user_auth.py"]
+```
+
+---
+
+### 5. Git Operations Agent (`GitOperationsAgent`)
 
 **Purpose**: Comprehensive git repository management and version control operations.
 
@@ -230,19 +345,25 @@ All agents inherit from the `BaseAgent` class, which provides:
 
 The LangGraph orchestrator provides sophisticated workflow management:
 
-### Workflow Phases
+### Enhanced Workflow Phases
 1. **Repository Analysis**: Intelligent codebase analysis and context extraction
-2. **Repository Setup**: Git operations and branch management
-3. **Code Generation**: AI-powered code creation based on analysis
-4. **Environment Setup**: Virtual environment and dependency management
-5. **Testing**: Comprehensive code validation and testing
-6. **Integration**: GitHub PR creation and workflow completion
+2. **Task Classification**: **NEW** - Determine modification vs creation approach
+3. **Repository Scanning**: **NEW** - Deep codebase understanding (when needed)
+4. **Repository Setup**: Git operations and branch management
+5. **Code Generation**: **ENHANCED** - Context-aware implementation with modification support
+6. **Environment Setup**: Virtual environment and dependency management
+7. **Testing**: Comprehensive code validation and testing
+8. **Integration**: GitHub PR creation and workflow completion
 
 ### Advanced Features
 - **Dynamic Routing**: Context-aware workflow path selection
 - **Parallel Execution**: Concurrent processing of independent tasks
 - **Error Recovery**: Multi-level error handling with intelligent retry
 - **State Persistence**: Workflow state preservation across interruptions
+- **🔍 Smart Task Understanding**: **NEW** - Automatically determines modification vs creation
+- **📊 Repository Intelligence**: **NEW** - Scans and understands existing codebase structure
+- **🔧 File Modification**: **NEW** - Can modify existing files while preserving functionality
+- **🎯 Context-Aware Generation**: **NEW** - Uses repository knowledge for better code generation
 - **Conditional Logic**: Smart decision making based on repository characteristics
 
 ## Usage Examples

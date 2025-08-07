@@ -5,8 +5,8 @@ import re
 
 import discord
 
-from .workflow import run_intelligent_workflow
 from .code_explainer import explain_repository
+from .workflow import run_intelligent_workflow
 
 
 def parse_discord_input(message_content: str) -> tuple[str, str, str] | None:
@@ -67,6 +67,7 @@ class OrionClient(discord.Client):
         create_pr: bool = False,
         enable_testing: bool = True,
         create_venv: bool = True,
+        conda_env: str = "ml",
         strict_testing: bool = False,
         **kwargs,
     ) -> None:
@@ -85,6 +86,7 @@ class OrionClient(discord.Client):
         self.create_pr = create_pr
         self.enable_testing = enable_testing
         self.create_venv = create_venv
+        self.conda_env = conda_env
         self.strict_testing = strict_testing
 
     async def on_ready(self) -> None:
@@ -99,6 +101,7 @@ class OrionClient(discord.Client):
         print(f"   🚀 Auto-PR: {'✅' if self.create_pr else '❌'}")
         print(f"   🧪 Testing: {'✅' if self.enable_testing else '❌'}")
         print(f"   🐍 Virtual Env: {'✅' if self.create_venv else '❌'}")
+        print(f"   🐍 Conda Env: {self.conda_env}")
         print(f"   🔒 Strict Testing: {'✅' if self.strict_testing else '❌'}")
         print("=" * 60)
         print(f"📝 **Expected Input Format:**")
@@ -119,7 +122,7 @@ class OrionClient(discord.Client):
         try:
             # Parse the Discord input format
             parsed_input = parse_discord_input(text)
-            
+
             if not parsed_input:
                 # Send format error message
                 error_msg = (
@@ -139,7 +142,7 @@ class OrionClient(discord.Client):
                 )
                 await message.channel.send(error_msg)
                 return
-            
+
             repo_url, branch, task = parsed_input
 
             if task.strip().lower() == "explain":
@@ -197,6 +200,7 @@ class OrionClient(discord.Client):
                 self.workdir,
                 self.enable_testing,
                 self.create_venv,
+                self.conda_env,
                 self.strict_testing,
                 self.commit_changes,
                 self.create_pr,
@@ -296,6 +300,7 @@ def start_discord_bot(
     create_pr: bool = False,
     enable_testing: bool = True,
     create_venv: bool = True,
+    conda_env: str = "ml",
     strict_testing: bool = False,
 ) -> None:
     """Start a Discord bot to receive prompts and run the workflow."""
@@ -321,6 +326,7 @@ def start_discord_bot(
         create_pr=create_pr,
         enable_testing=enable_testing,
         create_venv=create_venv,
+        conda_env=conda_env,
         strict_testing=strict_testing,
         intents=intents,
     )

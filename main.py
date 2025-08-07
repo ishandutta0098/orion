@@ -16,8 +16,8 @@ from dotenv import load_dotenv
 
 from src.agents import GitHubIntegrationAgent
 from src.cli_interface import show_help_summary
-from src.discord_integration import start_discord_bot
 from src.code_explainer import explain_repository
+from src.discord_integration import start_discord_bot
 
 # Import LangGraph workflow as the default
 from src.workflow import run_intelligent_workflow
@@ -41,6 +41,8 @@ def main():
   • Dynamic workflow adaptation based on repository analysis
 
 💡 TIP: Use --debug for detailed workflow information!
+💡 TIP: Use --conda-env [env_name] to specify conda environment (default: ml)
+💡 TIP: Use --no-venv to skip environment creation and use conda instead
         """,
     )
     parser.add_argument(
@@ -94,6 +96,11 @@ def main():
         "--no-venv", action="store_true", help="Disable virtual environment creation"
     )
     parser.add_argument(
+        "--conda-env",
+        help="Conda environment to use for running code",
+        default="ml",
+    )
+    parser.add_argument(
         "--strict-testing", action="store_true", help="Abort commit if tests fail"
     )
     parser.add_argument(
@@ -137,6 +144,7 @@ def main():
             create_pr=args.create_pr,
             enable_testing=not args.no_testing,
             create_venv=not args.no_venv,
+            conda_env=args.conda_env,
             strict_testing=args.strict_testing,
         )
         return
@@ -194,6 +202,7 @@ def main():
             args.workdir,
             enable_testing=not args.no_testing,
             create_venv=not args.no_venv,
+            conda_env=args.conda_env,
             strict_testing=args.strict_testing,
             commit_changes=args.commit,
             create_pr=args.create_pr,
