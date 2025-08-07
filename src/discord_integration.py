@@ -52,6 +52,12 @@ def parse_discord_input(message_content: str) -> tuple[str, str, str] | None:
     return repo_url, branch, task
 
 
+def _chunk_text(text: str, max_length: int = 1900):
+    """Yield successive chunks of text under the Discord message limit."""
+    for i in range(0, len(text), max_length):
+        yield text[i : i + max_length]
+
+
 class OrionClient(discord.Client):
     def __init__(
         self,
@@ -141,9 +147,11 @@ class OrionClient(discord.Client):
                     f"📚 Generating codebase explanation for {repo_url} (branch: {branch})"
                 )
                 loop = asyncio.get_event_loop()
-                await loop.run_in_executor(
+                explanation = await loop.run_in_executor(
                     None, explain_repository, repo_url, self.workdir, branch
                 )
+                for chunk in _chunk_text(explanation or "No explanation generated"):
+                    await message.channel.send(f"```{chunk}```")
                 return
 
             # Send initial response
