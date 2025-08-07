@@ -38,8 +38,15 @@ def _summarize_repository(repo_path: str) -> str:
     return "\n".join(sorted(lines))
 
 
-def explain_repository(repo_url: str, workdir: str, branch: Optional[str] = None) -> None:
-    """Clone a repository and generate an OpenAI-powered explanation."""
+def explain_repository(
+    repo_url: str, workdir: str, branch: Optional[str] = None
+) -> str:
+    """Clone a repository and generate an OpenAI-powered explanation.
+
+    Returns the explanation string so it can be consumed by callers
+    (e.g., the Discord bot) in addition to being printed to the
+    terminal.
+    """
     repo_name = os.path.splitext(os.path.basename(repo_url.rstrip('/')))[0]
     repo_path = os.path.join(workdir, repo_name)
 
@@ -71,6 +78,10 @@ def explain_repository(repo_url: str, workdir: str, branch: Optional[str] = None
             f"Failed to generate explanation via OpenAI API: {e}\n" f"\n{summary}"
         )
 
-    print(f"\n📚 Codebase overview for {repo_name} (branch: {branch or 'default'})")
+    print(
+        f"\n📚 Codebase overview for {repo_name} (branch: {branch or 'default'})"
+    )
     print("=" * 60)
     print(explanation)
+
+    return explanation
