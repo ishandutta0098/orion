@@ -43,6 +43,9 @@ python main.py --list-repos
 
 # Discord bot integration
 python main.py --discord-bot
+
+# Explain repository structure with an OpenAI summary (no changes made)
+python main.py --prompt "Explain" --repo-url <repository-url> --branch <branch>
 ```
 
 ## 📋 Available Commands
@@ -51,6 +54,7 @@ python main.py --discord-bot
 |---------|-------------|
 | `--prompt "text"` | Instruction for the AI agent |
 | `--repo-url URL` | GitHub repository URL to work with |
+| `--branch BRANCH` | Name of the branch to work on |
 | `--commit` | Commit the generated changes |
 | `--create-pr` | Create a pull request (auto-enables --commit) |
 | `--debug` | Enable detailed LangGraph workflow information |
@@ -60,6 +64,7 @@ python main.py --discord-bot
 | `--list-repos` | List repositories from your GitHub account |
 | `--setup-auth` | Run authentication setup |
 | `--discord-bot` | Start Discord bot for interactive prompts |
+| `--prompt "Explain"` | Use OpenAI to describe the repository and ignore commit/PR flags |
 
 ## 🎯 LangGraph Architecture
 

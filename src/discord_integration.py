@@ -6,6 +6,7 @@ import re
 import discord
 
 from .workflow import run_intelligent_workflow
+from .code_explainer import explain_repository
 
 
 def parse_discord_input(message_content: str) -> tuple[str, str, str] | None:
@@ -134,7 +135,17 @@ class OrionClient(discord.Client):
                 return
             
             repo_url, branch, task = parsed_input
-            
+
+            if task.strip().lower() == "explain":
+                await message.channel.send(
+                    f"📚 Generating codebase explanation for {repo_url} (branch: {branch})"
+                )
+                loop = asyncio.get_event_loop()
+                await loop.run_in_executor(
+                    None, explain_repository, repo_url, self.workdir, branch
+                )
+                return
+
             # Send initial response
             status_msg = (
                 "🤖 **Hello Sir!** 👋\n\n"

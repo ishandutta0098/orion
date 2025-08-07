@@ -12,8 +12,9 @@ def show_help_summary() -> None:
         ✨ Powered by LangGraph for intelligent orchestration
 
         📚 REPOSITORY MANAGEMENT:
-        --list-repos       List repositories from your GitHub account  
+        --list-repos       List repositories from your GitHub account
         --repo-url URL     GitHub repository URL to operate on
+        --branch BRANCH    Name of the branch to operate on
         --setup-auth       Run authentication setup
 
         🤖 AI WORKFLOW:
@@ -43,6 +44,7 @@ def show_help_summary() -> None:
         💡 EXAMPLES:
         python main.py --prompt "Add logging functionality"
         python main.py --prompt "Build API with tests" --commit --create-pr --debug
+        python main.py --prompt "Explain" --repo-url <url> --branch <branch>
         python main.py --discord-bot --debug
         """
     )
