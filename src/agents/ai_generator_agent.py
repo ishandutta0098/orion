@@ -54,9 +54,9 @@ class AIGeneratorAgent(BaseAgent):
     """
 
     def __init__(
-        self, model: str = "gpt-5-nano", temperature: float = 1.0, debug: bool = False
+        self, model: str = "gpt-5-mini", temperature: float = 1.0, debug: bool = False
     ):
-        """
+        """https://docs.google.com/presentation/d/1p-GZmQFdUvU00q6jTyPJHyPhVsP783_NFlPHqjvOzgU/edit?usp=sharing
         Initialize the AI Generator Agent with GPT-5.
 
         Args:
